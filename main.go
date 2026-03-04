@@ -15,6 +15,7 @@ import (
 
 	"github.com/charmbracelet/huh"
 	_ "github.com/mattn/go-sqlite3"
+	"gopkg.in/ini.v1"
 )
 
 type browserKind int
@@ -78,7 +79,7 @@ func selectProfile(title string, options []huh.Option[string]) (string, error) {
 
 func findFirefoxDB(configDir string) (string, error) {
 	iniPath := filepath.Join(configDir, "profiles.ini")
-	data, err := os.ReadFile(iniPath)
+	cfg, err := ini.Load(iniPath)
 	if err != nil {
 		return "", fmt.Errorf("reading profiles.ini: %w", err)
 	}
@@ -89,18 +90,18 @@ func findFirefoxDB(configDir string) (string, error) {
 	}
 
 	var profiles []profile
-	var currentName, currentPath string
-	for line := range strings.SplitSeq(string(data), "\n") {
-		line = strings.TrimSpace(line)
-		if after, found := strings.CutPrefix(line, "Name="); found {
-			currentName = after
+	for _, section := range cfg.Sections() {
+		if section.Name() == "DEFAULT" || !section.HasKey("Path") {
+			continue
 		}
-		if after, found := strings.CutPrefix(line, "Path="); found {
-			currentPath = after
+		path := section.Key("Path").String()
+		name := section.Key("Name").String()
+		if name == "" {
+			name = path
 		}
-		if currentName != "" && currentPath != "" {
-			profiles = append(profiles, profile{currentName, currentPath})
-			currentName, currentPath = "", ""
+		placesPath := filepath.Join(configDir, path, "places.sqlite")
+		if _, err := os.Stat(placesPath); err == nil {
+			profiles = append(profiles, profile{name, path})
 		}
 	}
 
@@ -109,11 +110,7 @@ func findFirefoxDB(configDir string) (string, error) {
 	}
 
 	if len(profiles) == 1 {
-		placesPath := filepath.Join(configDir, profiles[0].path, "places.sqlite")
-		if _, err := os.Stat(placesPath); err != nil {
-			return "", fmt.Errorf("places.sqlite not found at %s: %w", placesPath, err)
-		}
-		return placesPath, nil
+		return filepath.Join(configDir, profiles[0].path, "places.sqlite"), nil
 	}
 
 	options := make([]huh.Option[string], len(profiles))
@@ -126,11 +123,7 @@ func findFirefoxDB(configDir string) (string, error) {
 		return "", err
 	}
 
-	placesPath := filepath.Join(configDir, selectedPath, "places.sqlite")
-	if _, err := os.Stat(placesPath); err != nil {
-		return "", fmt.Errorf("places.sqlite not found at %s: %w", placesPath, err)
-	}
-	return placesPath, nil
+	return filepath.Join(configDir, selectedPath, "places.sqlite"), nil
 }
 
 func findChromeDB(configDir string, browserName string) (string, error) {
@@ -206,6 +199,12 @@ func findDB(b browser) (string, error) {
 
 const chromeEpochOffsetUsec = 11644473600 * 1_000_000
 
+func escapeLike(s string) string {
+	s = strings.ReplaceAll(s, `%`, `\%`)
+	s = strings.ReplaceAll(s, `_`, `\_`)
+	return s
+}
+
 func extractHost(rawURL string) string {
 	parsed, err := url.Parse(rawURL)
 	if err != nil || parsed.Host == "" {
@@ -242,9 +241,11 @@ func queryHosts(db *sql.DB, kind browserKind, cutoff time.Time) (map[string]int,
 	defer func() { _ = rows.Close() }()
 
 	hostSet := map[string]int{}
+	var scanErrors []error
 	for rows.Next() {
 		var u string
 		if err := rows.Scan(&u); err != nil {
+			scanErrors = append(scanErrors, err)
 			continue
 		}
 		host := extractHost(u)
@@ -254,6 +255,12 @@ func queryHosts(db *sql.DB, kind browserKind, cutoff time.Time) (map[string]int,
 	}
 	if err := rows.Err(); err != nil {
 		return nil, fmt.Errorf("iterating history rows: %w", err)
+	}
+	if len(scanErrors) > 0 {
+		fmt.Fprintf(os.Stderr, "Warning: %d row(s) could not be scanned:\n", len(scanErrors))
+		for _, err := range scanErrors {
+			fmt.Fprintf(os.Stderr, "  - %v\n", err)
+		}
 	}
 	return hostSet, nil
 }
@@ -271,8 +278,9 @@ func deleteHosts(db *sql.DB, kind browserKind, domains []string) (deleted int, r
 
 	totalDeleted := 0
 	for _, domain := range domains {
-		exactPattern := "%://" + domain
-		pathPattern := "%://" + domain + "/%"
+		escapedDomain := escapeLike(domain)
+		exactPattern := "%://" + escapedDomain
+		pathPattern := "%://" + escapedDomain + "/%"
 
 		var res sql.Result
 		switch kind {
@@ -280,13 +288,13 @@ func deleteHosts(db *sql.DB, kind browserKind, domains []string) (deleted int, r
 			res, err = tx.Exec(`
 				DELETE FROM moz_historyvisits
 				WHERE place_id IN (
-					SELECT id FROM moz_places WHERE url LIKE ? OR url LIKE ?
+					SELECT id FROM moz_places WHERE url LIKE ? ESCAPE '\' OR url LIKE ? ESCAPE '\'
 				)`, exactPattern, pathPattern)
 		default:
 			res, err = tx.Exec(`
 				DELETE FROM visits
 				WHERE url IN (
-					SELECT id FROM urls WHERE url LIKE ? OR url LIKE ?
+					SELECT id FROM urls WHERE url LIKE ? ESCAPE '\' OR url LIKE ? ESCAPE '\'
 				)`, exactPattern, pathPattern)
 		}
 		if err != nil {
@@ -300,13 +308,13 @@ func deleteHosts(db *sql.DB, kind browserKind, domains []string) (deleted int, r
 		case browserFirefox:
 			_, err = tx.Exec(`
 				DELETE FROM moz_places
-				WHERE (url LIKE ? OR url LIKE ?)
+				WHERE (url LIKE ? ESCAPE '\' OR url LIKE ? ESCAPE '\')
 				AND id NOT IN (SELECT place_id FROM moz_historyvisits)
 				AND foreign_count = 0`, exactPattern, pathPattern)
 		default:
 			_, err = tx.Exec(`
 				DELETE FROM urls
-				WHERE (url LIKE ? OR url LIKE ?)
+				WHERE (url LIKE ? ESCAPE '\' OR url LIKE ? ESCAPE '\')
 				AND id NOT IN (SELECT url FROM visits)`, exactPattern, pathPattern)
 		}
 		if err != nil {

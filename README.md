@@ -1,6 +1,6 @@
 # history-cleaner
 
-[![Go](https://img.shields.io/badge/Go-1.25-00ADD8?logo=go&logoColor=white)](https://go.dev/)
+[![Go](https://img.shields.io/badge/Go-1.26-00ADD8?logo=go&logoColor=white)](https://go.dev/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Go Report Card](https://goreportcard.com/badge/github.com/mahendrakalkura/history-cleaner)](https://goreportcard.com/report/github.com/mahendrakalkura/history-cleaner)
 [![Platform](https://img.shields.io/badge/Platform-Linux-lightgrey?logo=linux&logoColor=white)](https://www.linux.org/)
@@ -62,7 +62,7 @@ The selected domains are listed and you are asked to confirm. On confirmation, a
 
 - Linux with `pgrep` available
 - Firefox, Chrome, or Chromium installed
-- Go 1.25+ and CGO enabled (for building)
+- Go 1.26+ and CGO enabled (for building)
 
 ## Build
 
@@ -78,7 +78,40 @@ make build
 
 Close the target browser before running.
 
+## Development
+
+```sh
+make build      # Format, fetch deps, tidy, compile
+make lint       # Run golangci-lint
+make test       # Run tests with coverage report
+make run        # Build and run
+make benchmarks # Run benchmarks
+```
+
+### Example Output
+
+**`make test`:**
+```
+=== RUN   TestExtractHost
+--- PASS: TestExtractHost (0.00s)
+=== RUN   TestEscapeLike
+--- PASS: TestEscapeLike (0.00s)
+...
+PASS
+coverage: 26.1% of statements
+
+Coverage:
+26.1%
+```
+
+**`make benchmarks`:**
+```
+BenchmarkExtractHost-12    2031642    594.1 ns/op    432 B/op    3 allocs/op
+BenchmarkEscapeLike-12    10979582    110.5 ns/op     32 B/op    2 allocs/op
+```
+
 ## Dependencies
 
 - [charmbracelet/huh](https://github.com/charmbracelet/huh) — interactive terminal forms
 - [mattn/go-sqlite3](https://github.com/mattn/go-sqlite3) — SQLite driver
+- [gopkg.in/ini.v1](https://gopkg.in/ini.v1) — INI file parser

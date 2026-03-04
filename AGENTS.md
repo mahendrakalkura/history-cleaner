@@ -25,6 +25,7 @@ Single-file application (`main.go`, ~480 lines). No packages, no interfaces.
 - `findFirefoxDB(configDir)` — parses `profiles.ini` for profile selection
 - `findChromeDB(configDir, name)` — parses `Local State` JSON, falls back to globbing `*/History`
 - `extractHost(rawURL)` — returns hostname from URL
+- `escapeLike(s)` — escapes `%` and `_` for safe SQL LIKE patterns
 - `queryHosts(db, kind, cutoff)` — queries recent history, returns domain→count map
 - `deleteHosts(db, kind, domains)` — deletes visits + orphaned URLs in a transaction, returns deleted/remaining counts
 
@@ -42,22 +43,26 @@ Single-file application (`main.go`, ~480 lines). No packages, no interfaces.
 
 ## Tech Stack
 
-- **Go 1.25** with CGO (required for sqlite3)
+- **Go 1.26** with CGO (required for sqlite3)
 - **charmbracelet/huh** for terminal UI
 - **mattn/go-sqlite3** for SQLite access
+- **gopkg.in/ini.v1** for INI file parsing (Firefox profiles)
 
 ## Build
 
 ```sh
-make build    # format, fetch deps, tidy, compile to ./main
-make lint     # golangci-lint
+make build      # format, fetch deps, tidy, compile to ./main
+make lint       # golangci-lint
+make test       # run tests with coverage report
+make run        # build and run
+make benchmarks # run benchmarks
 ```
 
 ## Conventions
 
 - All code in a single `main.go`
 - No comments in the code
-- No tests currently exist
+- Tests exist in main_test.go (unit tests, benchmarks, examples)
 - Error handling: print to stderr and `os.Exit(1)`
 - Use `huh` forms for all interactive prompts
 - Linux-only (uses `pgrep`, reads browser config from home dir)

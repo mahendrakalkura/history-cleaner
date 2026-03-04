@@ -1,10 +1,11 @@
-module main
+module github.com/mahendrakalkura/history-cleaner
 
-go 1.25.0
+go 1.26.0
 
 require (
 	github.com/charmbracelet/huh v0.8.0
 	github.com/mattn/go-sqlite3 v1.14.34
+	gopkg.in/ini.v1 v1.67.1
 )
 
 require (
