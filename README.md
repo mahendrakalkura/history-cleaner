@@ -7,6 +7,10 @@
 
 A command-line tool to selectively delete browsing history from Firefox, Chrome, or Chromium by domain.
 
+## Demo
+
+![Demo](demo.gif)
+
 ## How it works
 
 1. Choose a browser (Firefox, Chrome, or Chromium — only installed ones are shown)
