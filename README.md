@@ -1,5 +1,10 @@
 # history-cleaner
 
+[![Go](https://img.shields.io/badge/Go-1.25-00ADD8?logo=go&logoColor=white)](https://go.dev/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![Go Report Card](https://goreportcard.com/badge/github.com/mahendrakalkura/history-cleaner)](https://goreportcard.com/report/github.com/mahendrakalkura/history-cleaner)
+[![Platform](https://img.shields.io/badge/Platform-Linux-lightgrey?logo=linux&logoColor=white)](https://www.linux.org/)
+
 A command-line tool to selectively delete browsing history from Firefox, Chrome, or Chromium by domain.
 
 ## How it works
